@@ -129,10 +129,36 @@ def update_button_positions(plot_id):
     dpg.set_item_pos("export_json_button", (plot_left, button_y))
     dpg.set_item_pos("export_yaml_button", (plot_left, button_y + 40))  # Offset below the first button
 
+# Periodically update the plot
+def periodic_update_plot(plot_id, fake_data_storage, interval=1.0):
+    global update_flag
+    while update_flag:
+        time.sleep(interval)  # Wait for the specified interval
+        # Call update_plot within the loop
+        update_plot(None, None, (plot_id, fake_data_storage))
+
+# Start periodic updates
+def start_periodic_update(plot_id, fake_data_storage):
+    global update_flag
+    if not update_flag:  # Prevent multiple threads
+        update_flag = True
+        threading.Thread(
+            target=periodic_update_plot,
+            args=(plot_id, fake_data_storage),
+            daemon=True
+        ).start()
+        print("Started periodic updates.")
+
+# Stop periodic updates
+def stop_periodic_update():
+    global update_flag
+    update_flag = False
+    print("Stopped periodic updates.")
+
+# Update plot function
 def update_plot(sender, app_data, user_data):
     plot_id, fake_data_storage = user_data
     raw_data_json = dpg.get_value(fake_data_storage)  # Retrieve serialized JSON
-    print(f"Raw data JSON in update_plot: {raw_data_json}")  # Debug: Print the raw JSON
     try:
         # Deserialize JSON string into Python objects
         data = json.loads(raw_data_json)
@@ -197,22 +223,78 @@ def main_gui(screen_width, screen_height):
         slider_x = plot_x - 300  # Position sliders 250px to the left of the plot
         slider_y = plot_y + 20  # Align sliders with the top of the plot
 
-        dpg.add_slider_int(label="Width", default_value=plot_width, min_value=400, max_value=3000,
-                           callback=update_plot_width, user_data=plot_id, pos=(slider_x, slider_y), width=200)
-        dpg.add_slider_int(label="Height", default_value=plot_height, min_value=400, max_value=1900,
-                           callback=update_plot_height, user_data=plot_id, pos=(slider_x, slider_y + 60), width=200)
+        # dpg.add_slider_int(label="Width", default_value=plot_width, min_value=400, max_value=3000,
+        #                    callback=update_plot_width, user_data=plot_id, pos=(slider_x, slider_y), width=200)
+        # dpg.add_slider_int(label="Height", default_value=plot_height, min_value=400, max_value=1500,
+        #                    callback=update_plot_height, user_data=plot_id, pos=(slider_x, slider_y + 60), width=200)
 
-        # Add a button to start fetching live data
-        dpg.add_button(label="Start Live Data", callback=lambda: threading.Thread(
-            target=fetch_live_data, args=("fake_data_storage",), daemon=True).start(),
-                       pos=(slider_x, slider_y + 120))
+        # # Add a button to start fetching live data
+        # dpg.add_button(label="Start Live Data", callback=lambda: threading.Thread(
+        #     target=fetch_live_data, args=("fake_data_storage",), daemon=True).start(),
+        #                pos=(slider_x, slider_y + 120))
 
-        # Add a button to stop fetching live data
-        dpg.add_button(label="Stop Live Data", callback=stop_fetching_live_data, pos=(slider_x, slider_y + 160))
+        # # Add a button to stop fetching live data
+        # dpg.add_button(label="Stop Live Data", callback=stop_fetching_live_data, pos=(slider_x, slider_y + 160))
 
-        # Add a button to manually refresh the plot
-        dpg.add_button(label="Update Plot", callback=lambda: update_plot(None, None, (scatter_series, "fake_data_storage")),
-                       pos=(slider_x, slider_y + 200))
+        # # # Add a button to manually refresh the plot
+        # # dpg.add_button(label="Update Plot", callback=lambda: update_plot(None, None, (scatter_series, "fake_data_storage")),
+        # #                pos=(slider_x, slider_y + 200))
+        
+        # # Add buttons to control updates
+        # dpg.add_button(
+        #     label="Start Periodic Update",
+        #     callback=lambda: start_periodic_update(scatter_series, "fake_data_storage"),
+        #     pos=(slider_x - 300, slider_y + 20)
+        # )
+
+        # dpg.add_button(
+        #     label="Stop Periodic Update",
+        #     callback=stop_periodic_update,
+        #     pos=(slider_x - 300, slider_y + 60)
+        # )
+                # Add a group for layout organization
+        with dpg.group(horizontal=False, pos=(slider_x, slider_y)):
+            # Add sliders for dynamic resizing
+            dpg.add_slider_int(
+                label="Width",
+                default_value=plot_width,
+                min_value=400,
+                max_value=3000,
+                callback=update_plot_width,
+                user_data=plot_id,
+                width=200
+            )
+            dpg.add_slider_int(
+                label="Height",
+                default_value=plot_height,
+                min_value=400,
+                max_value=1500,
+                callback=update_plot_height,
+                user_data=plot_id,
+                width=200
+            )
+
+            # Add buttons for live data
+            dpg.add_button(
+                label="Start Live Data",
+                callback=lambda: threading.Thread(
+                    target=fetch_live_data, args=("fake_data_storage",), daemon=True
+                ).start()
+            )
+            dpg.add_button(
+                label="Stop Live Data",
+                callback=stop_fetching_live_data
+            )
+
+            # Add buttons to control updates
+            dpg.add_button(
+                label="Start Periodic Update",
+                callback=lambda: start_periodic_update(scatter_series, "fake_data_storage")
+            )
+            dpg.add_button(
+                label="Stop Periodic Update",
+                callback=stop_periodic_update
+            )
 
 # Stop fetching live data
 def stop_fetching_live_data():
